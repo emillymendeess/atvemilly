@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Garagem Unificada V3</title>
+    <style>
+        /* Reset Básico & Estilos Globais */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; }
+        .app-container { max-width: 1200px; margin: 30px auto; background-color: #fff; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background-color: #004a7c; color: white; padding: 20px; text-align: center; }
+        header h1 { margin: 0; font-size: 2em; }
+        nav.app-nav { display: flex; background-color: #005691; }
+        nav.app-nav a { color: white; padding: 15px 25px; text-decoration: none; display: block; text-align: center; flex-grow: 1; transition: background-color 0.3s; font-weight: 500; }
+        nav.app-nav a:hover, nav.app-nav a.active { background-color: #003d6b; }
+        .main-area { padding: 25px; }
+        .view { display: none; /* Todas as views começam escondidas */ animation: fadeIn 0.5s; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Estilos para seções dentro das views (reutilizar .container, .section se necessário) */
+        .section-title { font-size: 1.8em; color: #005691; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group input[type="date"], .form-group select, .form-group textarea {
+            width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em;
+        }
+        button { background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; font-weight: 500; transition: background-color 0.2s, transform 0.1s; }
+        button:hover { background-color: #0056b3; transform: translateY(-1px); }
+        button.danger { background-color: #dc3545; }
+        button.danger:hover { background-color: #c82333; }
+        button:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; transform: none; }
+
+        /* Lista de Veículos */
+        #listaGaragem { list-style: none; }
+        #listaGaragem li { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; transition: background-color 0.2s; border-radius: 4px; margin-bottom: 5px; }
+        #listaGaragem li:hover { background-color: #f9f9f9; }
+        #listaGaragem li.selecionado { background-color: #e0f0ff; border-left: 5px solid #007bff; }
+        #listaGaragem li .vehicle-info { cursor: pointer; flex-grow: 1; }
+        #listaGaragem li .vehicle-actions button { font-size: 0.9em; padding: 8px 12px; margin-left: 10px; }
+
+        /* Detalhes do Veículo (dentro da view Minha Garagem) */
+        #detalhes-veiculo-selecionado-container { margin-top: 30px; padding: 20px; background-color: #f9fcff; border: 1px solid #e0eafc; border-radius: 8px; }
+        #detalhes-veiculo-selecionado-container.hidden { display: none; }
+        .vehicle-details-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; align-items: start; }
+        .vehicle-image-info .output-info { font-family: monospace; white-space: pre-wrap; background-color: #eef; padding: 10px; border-radius: 5px; margin-top:15px;}
+        .vehicle-image-info img { max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #ddd; display: block; margin-bottom: 15px; }
+        .vehicle-interactions .actions-title { font-size: 1.2em; margin-bottom: 10px; color: #005691; }
+        .actions-group { margin-bottom: 20px; }
+        .actions-group button { margin-right: 10px; margin-bottom: 10px;}
+
+        /* Velocímetro e Manutenção (estilos da versão anterior podem ser adaptados aqui) */
+        #velocimetro-container { margin: 20px 0; }
+        #velocimetro-barra-bg { width: 100%; height: 25px; background-color: #e9ecef; border-radius: 5px; overflow: hidden; border: 1px solid #ced4da;}
+        #velocimetro-barra { height: 100%; background-color: #007bff; transition: width 0.3s ease-out; text-align: center; color: white; line-height: 25px; font-size: 0.9em; }
+        .maintenance-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+        .maintenance-list { list-style-type: none; padding-left: 0; }
+        .maintenance-list li { background-color: #f8f9fa; padding: 10px; margin-bottom: 8px; border-left: 3px solid #17a2b8; border-radius: 4px; font-size: 0.95em; }
+
+        /* Notificações */
+        #notificacoes-globais { position: fixed; top: 20px; right: 20px; z-index: 1050; width: 350px; }
+        .notificacao { padding: 15px; margin-bottom: 10px; border-radius: 6px; color: #fff; font-weight: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center; animation: slideInRight 0.5s; }
+        .notificacao.success { background-color: #28a745; }
+        .notificacao.error { background-color: #dc3545; }
+        .notificacao.info { background-color: #17a2b8; }
+        .notificacao.warning { background-color: #ffc107; color: #333; }
+        .notificacao button.close-notif { background: none; border: none; color: inherit; font-size: 1.5em; line-height: 1; cursor: pointer; opacity: 0.7; }
+        .notificacao button.close-notif:hover { opacity: 1; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Super Garagem Digital PRO++</h1>
+        </header>
+        <nav class="app-nav">
+            <a href="#" id="nav-minha-garagem" class="nav-link active">Minha Garagem</a>
+            <a href="#" id="nav-adicionar-veiculo" class="nav-link">Adicionar Veículo</a>
+            <a href="#" id="nav-painel-manutencoes" class="nav-link">Painel de Manutenções</a>
+        </nav>
+
+        <main class="main-area">
+            <div id="notificacoes-globais"></div>
+
+            <!-- VIEW: Minha Garagem -->
+            <div id="minha-garagem-view" class="view active">
+                <h2 class="section-title">Meus Veículos</h2>
+                <ul id="listaGaragem">
+                    <li><p>Nenhum veículo na garagem. Adicione um!</p></li>
+                </ul>
+
+                <div id="detalhes-veiculo-selecionado-container" class="hidden">
+                    <h3 id="detalhes-veiculo-titulo-selecionado">Detalhes do Veículo</h3>
+                    <div class="vehicle-details-grid">
+                        <div class="vehicle-image-info">
+                            <img id="imagemVeiculoSelecionado" src="images/carro_default.png" alt="Veículo">
+                            <div id="informacoesVeiculoSelecionado" class="output-info">Informações aqui...</div>
+                        </div>
+                        <div class="vehicle-interactions">
+                            <div id="velocimetro-container" class="hidden">
+                                <div id="velocimetro-barra-bg"><div id="velocimetro-barra">0 km/h</div></div>
+                            </div>
+                            <div class="actions-group">
+                                <h4 class="actions-title">Ações Gerais</h4>
+                                <button id="btn-ligar">Ligar</button>
+                                <button id="btn-desligar">Desligar</button>
+                                <button id="btn-acelerar">Acelerar</button>
+                                <button id="btn-frear">Frear</button>
+                                <button id="btn-buzinar">Buzinar</button>
+                            </div>
+                            <div id="acoes-especificas-selecionado" class="actions-group hidden">
+                                <h4 class="actions-title">Ações Específicas</h4>
+                                <button id="btn-turbo-ativar" class="hidden">Ativar Turbo</button>
+                                <button id="btn-turbo-desativar" class="hidden">Desativar Turbo</button>
+                                <div class="form-group hidden" id="carga-controls">
+                                    <label for="carga-valor">Carga (kg):</label>
+                                    <input type="number" id="carga-valor" value="100">
+                                    <button id="btn-carregar">Carregar</button>
+                                    <button id="btn-descarregar">Descarregar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="maintenance-section">
+                        <h4>Manutenção do Veículo</h4>
+                        <h5>Histórico Realizado:</h5>
+                        <ul id="lista-historico-manutencao-selecionado" class="maintenance-list"><li class="empty">Nenhum histórico.</li></ul>
+                        <h5>Agendamentos Futuros:</h5>
+                        <ul id="lista-agendamentos-manutencao-selecionado" class="maintenance-list"><li class="empty">Nenhum agendamento.</li></ul>
+                        <h5>Agendar/Registrar Nova Manutenção:</h5>
+                        <form id="form-agendar-manutencao-selecionado" class="form-group">
+                            <label for="manutencao-data">Data:</label>
+                            <input type="date" id="manutencao-data" required>
+                            <label for="manutencao-tipo">Tipo de Serviço:</label>
+                            <input type="text" id="manutencao-tipo" placeholder="Ex: Troca de Óleo" required>
+                            <label for="manutencao-custo">Custo (R$):</label>
+                            <input type="number" id="manutencao-custo" placeholder="150.00" step="0.01" min="0"> <!-- Custo opcional para agendamento -->
+                            <label for="manutencao-descricao">Descrição (Opcional):</label>
+                            <textarea id="manutencao-descricao" placeholder="Detalhes..."></textarea>
+                            <button type="submit">Salvar Manutenção</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Adicionar Veículo -->
+            <div id="adicionar-veiculo-view" class="view">
+                <h2 class="section-title">Adicionar Novo Veículo</h2>
+                <form id="form-add-veiculo">
+                    <div class="form-group">
+                        <label for="add-veiculo-tipo">Tipo:</label>
+                        <select id="add-veiculo-tipo">
+                            <option value="Carro">Carro Comum</option>
+                            <option value="CarroEsportivo">Carro Esportivo</option>
+                            <option value="Caminhao">Caminhão</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="add-veiculo-modelo">Modelo:</label>
+                        <input type="text" id="add-veiculo-modelo" placeholder="Monza" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="add-veiculo-cor">Cor:</label>
+                        <input type="text" id="add-veiculo-cor" placeholder="Vinho" required>
+                    </div>
+                    <div id="add-campos-caminhao" class="form-group hidden">
+                        <label for="add-caminhao-capacidade">Capacidade de Carga (kg):</label>
+                        <input type="number" id="add-caminhao-capacidade" value="5000" min="0">
+                    </div>
+                    <button type="submit">Adicionar à Garagem</button>
+                </form>
+            </div>
+
+            <!-- VIEW: Painel de Manutenções -->
+            <div id="painel-manutencoes-view" class="view">
+                <h2 class="section-title">Painel Geral de Manutenções</h2>
+                <h3>Todos Agendamentos Futuros</h3>
+                <ul id="lista-todos-agendamentos" class="maintenance-list">
+                    <li class="empty">Nenhum agendamento futuro em toda a garagem.</li>
+                </ul>
+            </div>
+        </main>
+    </div>
+
+<script>
+    // --- CLASSES Manutencao, Veiculo, Carro, CarroEsportivo, Caminhao (Mantidas como na versão anterior, com pequenos ajustes se necessário) ---
+    // ... (Cole as definições das classes daqui da sua resposta anterior, pois são extensas e não mudam fundamentalmente)
+    // Pequena correção: _tipoVeiculo já é this.constructor.name, então não precisa ser passado explicitamente para mensagens
+    class Manutencao { constructor(data, tipo, custo, descricao = '') { this.data = data instanceof Date ? data : new Date(data); this.tipo = tipo; this.custo = parseFloat(custo) || 0; this.descricao = descricao; } formatar() { const df = this.data.toLocaleDateString('pt-BR', {timeZone: 'UTC'}); const cf = this.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); let i = `${df} - ${this.tipo} (${cf || 'Custo não definido'})`; if (this.descricao) i += ` | ${this.descricao}`; return i; } validar() { return (this.data instanceof Date && !isNaN(this.data.getTime())) && (typeof this.tipo === 'string' && this.tipo.trim() !== '') && (typeof this.custo === 'number' && this.custo >= 0); } toJSON() { return { data: this.data.toISOString().split('T')[0], tipo: this.tipo, custo: this.custo, descricao: this.descricao }; } }
+    class Veiculo { constructor(modelo, cor) { this.modelo = modelo; this.cor = cor; this.ligado = false; this.imagemUrl = "images/carro_default.png"; this.velocidadeMaxima = 180; this.historicoManutencao = []; this._tipoVeiculo = this.constructor.name; this.audioLigar = new Audio('audio/ligar_som.mp3'); this.audioDesligar = new Audio('audio/desligar_som.mp3'); this.audioErro = new Audio('audio/erro_som.mp3');} _playSound(audio) { if(audio){audio.currentTime=0;audio.play().catch(e=>{});}} adicionarManutencao(mObj){if(mObj instanceof Manutencao && mObj.validar()){this.historicoManutencao.push(mObj);this.historicoManutencao.sort((a,b)=>b.data-a.data);return true;}return false;} obterHistoricoManutencaoFormatado(apenasFuturos=false){const hoje=new Date();hoje.setHours(0,0,0,0);return this.historicoManutencao.filter(m=>{const dM=new Date(m.data);dM.setHours(0,0,0,0);return apenasFuturos?dM>=hoje:dM<hoje;}).map(m=>m.formatar());} ligar(){if(!this.ligado){this.ligado=true;this._playSound(this.audioLigar);return`${this._tipoVeiculo} '${this.modelo}' ligado.`;}this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' já ligado.`;} desligar(){if(this.ligado){this.ligado=false;this._playSound(this.audioDesligar);return`${this._tipoVeiculo} '${this.modelo}' desligado.`;}this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' já desligado.`;} buzinar(){if(!this.ligado){this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' precisa estar ligado.`;}return`Veiculo '${this.modelo}': Beep!`;} exibirInformacoes(){const st=this.ligado?'<span class="status-ligado">Ligado ✔️</span>':'<span class="status-desligado">Desligado ❌</span>';return`== ${this._tipoVeiculo}: ${this.modelo} ==\nCor: ${this.cor}\nEstado: ${st}`;}}
+    class Carro extends Veiculo { constructor(modelo, cor){super(modelo,cor);this.velocidade=0;this.imagemUrl="images/carro_comum.png";this.velocidadeMaxima=200;this.audioBuzina=new Audio('audio/buzina_carro_som.mp3');this.audioAcelerar=new Audio('audio/acelerar_som.mp3');this.audioFrear=new Audio('audio/frear_som.mp3');} desligar(){if(this.ligado&&this.velocidade>0){this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' parado (Vel.:${this.velocidade}km/h).`;}return super.desligar();} acelerar(inc=10){if(!this.ligado){this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' desligado.`;}if(this.velocidade+inc>this.velocidadeMaxima){this.velocidade=this.velocidadeMaxima;this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' vel. max ${this.velocidadeMaxima}km/h.`;}this.velocidade+=inc;this._playSound(this.audioAcelerar);return`${this._tipoVeiculo} '${this.modelo}' acelerando ${this.velocidade}km/h.`;} frear(dec=10){if(!this.ligado){this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' desligado.`;}if(this.velocidade>0){this.velocidade=Math.max(0,this.velocidade-dec);this._playSound(this.audioFrear);return`${this._tipoVeiculo} '${this.modelo}' freando ${this.velocidade}km/h.`;}this._playSound(this.audioErro);return`${this._tipoVeiculo} '${this.modelo}' já parado.`;} buzinar(){if(!this.ligado)return super.buzinar();this._playSound(this.audioBuzina);return`Carro '${this.modelo}': Biiii!`;} exibirInformacoes(){return`${super.exibirInformacoes()}\nVelocidade: ${this.velocidade}km/h (Max:${this.velocidadeMaxima}km/h)`;}}
+    class CarroEsportivo extends Carro { constructor(modelo, cor){super(modelo,cor);this.turboAtivado=false;this.imagemUrl="images/carro_esportivo.png";this.velocidadeMaxima=320;this.audioBuzina=new Audio('audio/buzina_esportivo_som.mp3');this.audioTurbo=new Audio('audio/turbo_ativar_som.mp3');} ativarTurbo(){if(!this.ligado){this._playSound(this.audioErro);return`${this.modelo} desligado.`;}if(!this.turboAtivado){this.turboAtivado=true;this._playSound(this.audioTurbo);return`Turbo ATIVADO ${this.modelo}!🚀`;}this._playSound(this.audioErro);return`Turbo já ativado.`;} desativarTurbo(){if(this.turboAtivado){this.turboAtivado=false;return`Turbo DESATIVADO ${this.modelo}.`;}this._playSound(this.audioErro);return`Turbo já desativado.`;} acelerar(inc=25){if(!this.ligado){this._playSound(this.audioErro);return`${this.modelo} desligado.`;}let acelReal=this.turboAtivado?inc*1.8:inc;if(this.velocidade+acelReal>this.velocidadeMaxima){this.velocidade=this.velocidadeMaxima;this._playSound(this.audioErro);return`${this.modelo} vel. max ${this.velocidadeMaxima}km/h.`;}this.velocidade+=acelReal;this._playSound(this.audioAcelerar);return`${this.modelo} ${this.turboAtivado?'TURBO🔥 ':''}acelerando ${this.velocidade.toFixed(0)}km/h.`;} buzinar(){if(!this.ligado)return super.buzinar();this._playSound(this.audioBuzina);return`Esportivo '${this.modelo}': VROOOM!🎺`;} exibirInformacoes(){return`${super.exibirInformacoes()}\nTurbo: ${this.turboAtivado?'Ativado 🔥':'Desativado ❄️'}`;} }
+    class Caminhao extends Carro { constructor(modelo, cor, capacidadeCarga){super(modelo,cor);this.capacidadeCarga=capacidadeCarga;this.cargaAtual=0;this.imagemUrl="images/caminhao.png";this.velocidadeMaxima=140;this.audioBuzina=new Audio('audio/buzina_caminhao_som.mp3');} carregar(peso){if(this.ligado){this._playSound(this.audioErro);return"Desligue p/ carregar.";}if(peso<=0){this._playSound(this.audioErro);return"Peso > 0.";}if(this.cargaAtual+peso<=this.capacidadeCarga){this.cargaAtual+=peso;return`${this.modelo} carregado ${peso}kg. Carga:${this.cargaAtual}kg.`;}this._playSound(this.audioErro);return`Cap(${this.capacidadeCarga}kg) excedida. Pode +${this.capacidadeCarga-this.cargaAtual}kg.`;} descarregar(peso){if(this.ligado){this._playSound(this.audioErro);return"Desligue p/ descarregar.";}if(peso<=0){this._playSound(this.audioErro);return"Peso > 0.";}if(this.cargaAtual-peso>=0){this.cargaAtual-=peso;return`${this.modelo} descarregado ${peso}kg. Carga:${this.cargaAtual}kg.`;}this._playSound(this.audioErro);return`Não há ${peso}kg p/ descarregar. Carga:${this.cargaAtual}kg.`;} acelerar(inc=8){if(!this.ligado){this._playSound(this.audioErro);return`${this.modelo} desligado.`;}const fc=Math.max(0.1,1-(this.cargaAtual/(this.capacidadeCarga*1.1)));const ae=Math.max(1,inc*fc);if(this.velocidade+ae>this.velocidadeMaxima){this.velocidade=this.velocidadeMaxima;this._playSound(this.audioErro);return`${this.modelo} vel. max ${this.velocidadeMaxima}km/h.`;}this.velocidade+=ae;this._playSound(this.audioAcelerar);return`${this.modelo} acelerando ${this.velocidade.toFixed(0)}km/h (Carga:${this.cargaAtual}kg).`;} buzinar(){if(!this.ligado)return super.buzinar();this._playSound(this.audioBuzina);return`Caminhão '${this.modelo}': FOOOM!🚛`;} exibirInformacoes(){return`${super.exibirInformacoes()}\nCarga: ${this.cargaAtual}kg / ${this.capacidadeCarga}kg`;} }
+
+
+    // --- CLASSE GARAGEM (Refatorada para nova UI e fluxo) ---
+    const GARAGEM_STORAGE_KEY = 'garagemUnificada_V3_Final';
+
+    class Garagem {
+        constructor() {
+            this.veiculos = [];
+            this.veiculoSelecionadoIndex = -1;
+            this.activeViewId = 'minha-garagem-view';
+
+            this.el = {
+                navLinks: document.querySelectorAll('.app-nav .nav-link'),
+                contentViews: document.querySelectorAll('.main-area .view'),
+                // Notificações
+                notificacoesGlobais: document.getElementById('notificacoes-globais'),
+                notificacoesLembretesContainer: document.getElementById('notificacoes-lembretes-container'), // Para lembretes de manutenção
+                // View Adicionar Veículo
+                formAddVeiculo: document.getElementById('form-add-veiculo'),
+                addTipoSelect: document.getElementById('add-veiculo-tipo'),
+                addModeloInput: document.getElementById('add-veiculo-modelo'),
+                addCorInput: document.getElementById('add-veiculo-cor'),
+                addCamposCaminhaoDiv: document.getElementById('add-campos-caminhao'),
+                addCapacidadeCaminhaoInput: document.getElementById('add-caminhao-capacidade'),
+                // View Minha Garagem (Lista)
+                listaGaragemUl: document.getElementById('listaGaragem'),
+                // View Detalhes Veículo Selecionado (que agora é uma seção dentro de Minha Garagem)
+                detalhesVeiculoSelecionadoContainer: document.getElementById('detalhes-veiculo-selecionado-container'),
+                detalhesVeiculoTitulo: document.getElementById('detalhes-veiculo-titulo-selecionado'),
+                imagemVeiculo: document.getElementById('imagemVeiculoSelecionado'),
+                informacoesVeiculo: document.getElementById('informacoesVeiculoSelecionado'),
+                velocimetroContainer: document.getElementById('velocimetro-container'),
+                velocimetroBarra: document.getElementById('velocimetro-barra'),
+                btnLigar: document.getElementById('btn-ligar'),
+                btnDesligar: document.getElementById('btn-desligar'),
+                btnAcelerar: document.getElementById('btn-acelerar'),
+                btnFrear: document.getElementById('btn-frear'),
+                btnBuzinar: document.getElementById('btn-buzinar'),
+                acoesEspecificasContainer: document.getElementById('acoes-especificas-selecionado'),
+                btnTurboAtivar: document.getElementById('btn-turbo-ativar'),
+                btnTurboDesativar: document.getElementById('btn-turbo-desativar'),
+                cargaControlsDiv: document.getElementById('carga-controls'),
+                inputCarga: document.getElementById('carga-valor'),
+                btnCarregar: document.getElementById('btn-carregar'),
+                btnDescarregar: document.getElementById('btn-descarregar'),
+                formAgendarManutencao: document.getElementById('form-agendar-manutencao-selecionado'),
+                manutencaoDataInput: document.getElementById('manutencao-data'),
+                manutencaoTipoInput: document.getElementById('manutencao-tipo'),
+                manutencaoCustoInput: document.getElementById('manutencao-custo'),
+                manutencaoDescricaoInput: document.getElementById('manutencao-descricao'),
+                listaHistoricoManutencao: document.getElementById('lista-historico-manutencao-selecionado'),
+                listaAgendamentosManutencao: document.getElementById('lista-agendamentos-manutencao-selecionado'),
+                // View Painel Manutenções Geral
+                listaTodosAgendamentos: document.getElementById('lista-todos-agendamentos'),
+            };
+
+            this.carregarDoLocalStorage();
+            this.configurarListenersGlobais();
+            this.mostrarView(this.activeViewId);
+            this.renderizarListaVeiculos(); // Renderiza a lista de veículos na view "Minha Garagem"
+            this.verificarAgendamentosParaLembretes();
+        }
+
+        configurarListenersGlobais() {
+            // Navegação por Abas
+            this.el.navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const viewId = e.target.id.replace('nav-', '') + '-view';
+                    this.mostrarView(viewId);
+                });
+            });
+
+            // Formulário de Adicionar Veículo
+            this.el.formAddVeiculo.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.adicionarVeiculoViaForm();
+            });
+            this.el.addTipoSelect.addEventListener('change', () => this.atualizarCamposEspecificosFormAdicionar());
+
+
+            // Botões de Interação do Veículo Selecionado
+            this.el.btnLigar.onclick = () => this.interagirComSelecionado('ligar');
+            this.el.btnDesligar.onclick = () => this.interagirComSelecionado('desligar');
+            this.el.btnAcelerar.onclick = () => this.interagirComSelecionado('acelerar', 20);
+            this.el.btnFrear.onclick = () => this.interagirComSelecionado('frear', 15);
+            this.el.btnBuzinar.onclick = () => this.interagirComSelecionado('buzinar');
+            this.el.btnTurboAtivar.onclick = () => this.interagirComSelecionado('ativarTurbo');
+            this.el.btnTurboDesativar.onclick = () => this.interagirComSelecionado('desativarTurbo');
+            this.el.btnCarregar.onclick = () => this.interagirComSelecionado('carregar');
+            this.el.btnDescarregar.onclick = () => this.interagirComSelecionado('descarregar');
+
+            // Formulário de Agendar Manutenção para Veículo Selecionado
+            this.el.formAgendarManutencao.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleAgendarManutencaoParaVeiculoSelecionado();
+            });
+        }
+
+        mostrarView(viewId) {
+            try {
+                this.el.contentViews.forEach(view => view.classList.remove('active'));
+                this.el.navLinks.forEach(link => link.classList.remove('active'));
+
+                const activeView = document.getElementById(viewId);
+                const navIdForView = viewId.replace('-view', '').replace('minha-garagem', 'minha-garagem'); // Ajuste para ID do link
+                const activeLink = document.getElementById(`nav-${navIdForView}`);
+
+                if (activeView) activeView.classList.add('active');
+                if (activeLink) activeLink.classList.add('active');
+                this.activeViewId = viewId;
+
+                if (viewId === 'minha-garagem-view') {
+                    this.renderizarListaVeiculos(); // Sempre renderiza ao mostrar esta view
+                    if (this.veiculoSelecionadoIndex === -1) {
+                         this.el.detalhesVeiculoSelecionadoContainer.classList.add('hidden');
+                    } else {
+                        // Se havia um veículo selecionado, re-renderiza seus detalhes
+                        this.atualizarPainelDetalhesVeiculo();
+                    }
+                } else if (viewId === 'painel-manutencoes-view') {
+                    this.renderizarPainelManutencoesGeral();
+                } else if (viewId === 'adicionar-veiculo-view') {
+                    this.atualizarCamposEspecificosFormAdicionar();
+                }
+
+                this.limparNotificacaoGlobal();
+            } catch (error) {
+                console.error("Erro ao mostrar view:", viewId, error);
+                this.exibirNotificacaoGlobal("Erro ao carregar a seção da página.", "error");
+            }
+        }
+        
+        atualizarCamposEspecificosFormAdicionar() {
+            const tipo = this.el.addTipoSelect.value;
+            this.el.addCamposCaminhaoDiv.classList.toggle('hidden', tipo !== 'Caminhao');
+        }
+
+        adicionarVeiculoViaForm() {
+            try {
+                const tipo = this.el.addTipoSelect.value;
+                const modelo = this.el.addModeloInput.value.trim();
+                const cor = this.el.addCorInput.value.trim();
+
+                if (!modelo || !cor) { this.exibirNotificacaoGlobal("Modelo e Cor são obrigatórios!", "error"); return; }
+
+                let novoVeiculo;
+                switch (tipo) {
+                    case 'Carro': novoVeiculo = new Carro(modelo, cor); break;
+                    case 'CarroEsportivo': novoVeiculo = new CarroEsportivo(modelo, cor); break;
+                    case 'Caminhao':
+                        const capacidade = parseInt(this.el.addCapacidadeCaminhaoInput.value);
+                        if (isNaN(capacidade) || capacidade <= 0) { this.exibirNotificacaoGlobal("Capacidade do caminhão inválida!", "error"); return; }
+                        novoVeiculo = new Caminhao(modelo, cor, capacidade);
+                        break;
+                    default: this.exibirNotificacaoGlobal("Tipo de veículo inválido!", "error"); return;
+                }
+                this.veiculos.push(novoVeiculo);
+                this.salvarNoLocalStorage();
+                this.el.formAddVeiculo.reset(); // Limpa o formulário
+                this.atualizarCamposEspecificosFormAdicionar(); // Reseta campos específicos
+                this.exibirNotificacaoGlobal(`${tipo} '${modelo}' adicionado com sucesso!`, "success");
+                this.mostrarView('minha-garagem-view'); // Navega para a lista de garagem
+            } catch (error) {
+                console.error("Erro ao adicionar veículo:", error);
+                this.exibirNotificacaoGlobal("Ocorreu um erro inesperado ao adicionar.", "error");
+            }
+        }
+
+        renderizarListaVeiculos() {
+            this.el.listaGaragemUl.innerHTML = '';
+            if (this.veiculos.length === 0) {
+                this.el.listaGaragemUl.innerHTML = '<li><p>Nenhum veículo na garagem. Adicione um na aba "Adicionar Veículo".</p></li>';
+                 this.el.detalhesVeiculoSelecionadoContainer.classList.add('hidden');
+                return;
+            }
+            this.veiculos.forEach((v, i) => {
+                const li = document.createElement('li');
+                li.className = (i === this.veiculoSelecionadoIndex) ? 'selecionado' : '';
+                
+                const infoSpan = document.createElement('span');
+                infoSpan.className = 'vehicle-info';
+                infoSpan.textContent = `${v._tipoVeiculo}: ${v.modelo} (${v.cor})`;
+                infoSpan.onclick = () => this.selecionarVeiculo(i); // Clicar na info seleciona
+                li.appendChild(infoSpan);
+
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'vehicle-actions';
+                const btnRemover = document.createElement('button');
+                btnRemover.textContent = 'Remover';
+                btnRemover.className = 'danger';
+                btnRemover.onclick = (e) => { e.stopPropagation(); this.removerVeiculo(i); };
+                actionsDiv.appendChild(btnRemover);
+                li.appendChild(actionsDiv);
+                this.el.listaGaragemUl.appendChild(li);
+            });
+        }
+
+        selecionarVeiculo(index) {
+            try {
+                if (index < 0 || index >= this.veiculos.length) {
+                    this.veiculoSelecionadoIndex = -1;
+                    this.el.detalhesVeiculoSelecionadoContainer.classList.add('hidden');
+                } else {
+                    this.veiculoSelecionadoIndex = index;
+                    this.el.detalhesVeiculoSelecionadoContainer.classList.remove('hidden');
+                    this.atualizarPainelDetalhesVeiculo();
+                }
+                this.renderizarListaVeiculos(); // Re-renderiza a lista para destacar o selecionado
+            } catch (error) {
+                console.error("Erro ao selecionar veículo:", error);
+                this.exibirNotificacaoGlobal("Erro ao exibir detalhes do veículo.", "error");
+            }
+        }
+        
+        atualizarPainelDetalhesVeiculo() {
+            if (this.veiculoSelecionadoIndex < 0) return; // Nenhum veículo selecionado
+
+            const v = this.veiculos[this.veiculoSelecionadoIndex];
+            if (!v) { // Segurança, caso o índice seja inválido por algum motivo
+                this.el.detalhesVeiculoSelecionadoContainer.classList.add('hidden');
+                return;
+            }
+            this.el.detalhesVeiculoTitulo.textContent = `Detalhes: ${v.modelo} (${v._tipoVeiculo})`;
+            this.el.informacoesVeiculo.innerHTML = v.exibirInformacoes();
+            this.el.imagemVeiculo.src = v.imagemUrl;
+            this.el.imagemVeiculo.alt = `Imagem ${v._tipoVeiculo} ${v.modelo}`;
+            this.el.imagemVeiculo.onerror = () => { this.el.imagemVeiculo.src = 'images/carro_default.png';};
+
+            this.el.velocimetroContainer.classList.toggle('hidden', !(v instanceof Carro));
+            if (v instanceof Carro) this.atualizarVelocimetroUI(v.velocidade, v.velocidadeMaxima);
+            
+            this.el.btnLigar.disabled = v.ligado;
+            this.el.btnBuzinar.disabled = !v.ligado;
+            if (v instanceof Carro) { this.el.btnDesligar.disabled = !v.ligado || v.velocidade > 0; this.el.btnAcelerar.disabled = !v.ligado || v.velocidade >= v.velocidadeMaxima; this.el.btnFrear.disabled = !v.ligado || v.velocidade === 0; }
+            else { this.el.btnDesligar.disabled = !v.ligado; this.el.btnAcelerar.disabled = true; this.el.btnFrear.disabled = true; }
+
+            const isEsportivo = v instanceof CarroEsportivo; const isCaminhao = v instanceof Caminhao;
+            this.el.acoesEspecificasContainer.classList.toggle('hidden', !(isEsportivo || isCaminhao));
+            this.el.btnTurboAtivar.classList.toggle('hidden', !(isEsportivo && !v.turboAtivado));
+            this.el.btnTurboDesativar.classList.toggle('hidden', !(isEsportivo && v.turboAtivado));
+            if(isEsportivo) this.el.btnTurboAtivar.disabled = !v.ligado;
+            
+            this.el.cargaControlsDiv.classList.toggle('hidden', !isCaminhao);
+            if(isCaminhao) { this.el.btnCarregar.disabled = v.ligado; this.el.btnDescarregar.disabled = v.ligado; }
+            
+            this.renderizarManutencoesParaVeiculoSelecionado();
+        }
+
+        atualizarVelocimetroUI(velAtual, velMax) { /* ... */ const perc = Math.min(100, (velAtual / velMax) * 100); this.el.velocimetroBarra.style.width = `${perc}%`; this.el.velocimetroBarra.textContent = `${velAtual.toFixed(0)} km/h`; if (perc > 80) this.el.velocimetroBarra.style.backgroundColor = '#dc3545'; else if (perc > 50) this.el.velocimetroBarra.style.backgroundColor = '#ffc107'; else this.el.velocimetroBarra.style.backgroundColor = '#007bff'; }
+        
+        interagirComSelecionado(acao, valor) {
+            try {
+                if (this.veiculoSelecionadoIndex < 0) { this.exibirNotificacaoGlobal("Nenhum veículo selecionado.", "error"); return; }
+                const v = this.veiculos[this.veiculoSelecionadoIndex];
+                let resultado = "";
+
+                if (typeof v[acao] === 'function') {
+                    if (acao === 'carregar' || acao === 'descarregar') {
+                        const cargaVal = parseInt(this.el.inputCarga.value);
+                        if (!isNaN(cargaVal) && cargaVal > 0) resultado = v[acao](cargaVal);
+                        else resultado = "Valor de carga deve ser um número positivo.";
+                    } else { resultado = v[acao](valor); }
+                } else { resultado = `Ação '${acao}' é desconhecida.`; }
+
+                const resL = resultado.toLowerCase();
+                let tipoMsg = "info";
+                if (resL.includes("ligado")||resL.includes("desligado")||resL.includes("ativado")||resL.includes("sucesso")||resL.includes("carregado")||resL.includes("acelerando")||resL.includes("freando")||resL.includes("buzinando")||(resL.includes("turbo")&&!resL.includes("já está"))) tipoMsg="success";
+                else if (resL.includes("precisa estar")||resL.includes("excedida")||resL.includes("inválido")||resL.includes("já está")||resL.includes("inválida")||resL.includes("atingiu vel. max")||resL.includes("parado") || resL.includes("desconhecida") || resL.includes("deve ser positivo")) tipoMsg="error";
+                
+                if(resultado) this.exibirNotificacaoGlobal(resultado, tipoMsg);
+                this.atualizarPainelDetalhesVeiculo(); // Atualiza toda a UI do veículo selecionado
+                this.salvarNoLocalStorage();
+            } catch (error) {
+                console.error(`Erro ao interagir (${acao}):`, error);
+                this.exibirNotificacaoGlobal("Erro durante a interação.", "error");
+            }
+        }
+        
+        handleAgendarManutencaoParaVeiculoSelecionado() {
+            try {
+                if (this.veiculoSelecionadoIndex < 0) { this.exibirNotificacaoGlobal("Selecione um veículo.", "error"); return; }
+                const veiculo = this.veiculos[this.veiculoSelecionadoIndex];
+                const dataInput = this.el.manutencaoDataInput.value;
+                const tipoInput = this.el.manutencaoTipoInput.value.trim();
+                const custoInput = this.el.manutencaoCustoInput.value; // Pode ser vazio
+                const descricaoInput = this.el.manutencaoDescricaoInput.value.trim();
+
+                if (!dataInput || !tipoInput) { this.exibirNotificacaoGlobal("Data e Tipo são obrigatórios para manutenção.", "error"); return; }
+                const custo = custoInput ? parseFloat(custoInput) : 0; // Custo 0 se não informado
+                if (isNaN(custo) || custo < 0) { this.exibirNotificacaoGlobal("Custo da manutenção inválido.", "error"); return; }
+
+                const novaManutencao = new Manutencao(new Date(dataInput + 'T00:00:00Z'), tipoInput, custo, descricaoInput); // Use Z para UTC
+
+                if (!novaManutencao.validar()) { this.exibirNotificacaoGlobal("Dados da manutenção inválidos.", "error"); return; }
+                if (veiculo.adicionarManutencao(novaManutencao)) {
+                    this.exibirNotificacaoGlobal("Manutenção registrada/agendada!", "success");
+                    this.el.formAgendarManutencao.reset();
+                    this.renderizarManutencoesParaVeiculoSelecionado();
+                    this.salvarNoLocalStorage();
+                    this.verificarAgendamentosParaLembretes();
+                    if (this.activeViewId === 'painel-manutencoes-view') this.renderizarPainelManutencoesGeral();
+                } else { this.exibirNotificacaoGlobal("Erro ao adicionar manutenção.", "error"); }
+            } catch (error) {
+                console.error("Erro ao agendar manutenção:", error);
+                this.exibirNotificacaoGlobal("Erro inesperado ao agendar.", "error");
+            }
+        }
+        renderizarManutencoesParaVeiculoSelecionado() { /* ... */ const v = this.veiculos[this.veiculoSelecionadoIndex]; if(!v) return; const histF = v.obterHistoricoManutencaoFormatado(false); this.el.listaHistoricoManutencao.innerHTML = histF.length > 0 ? histF.map(i => `<li>${i}</li>`).join('') : '<li class="empty">Nenhum histórico.</li>'; const agenF = v.obterHistoricoManutencaoFormatado(true); this.el.listaAgendamentosManutencao.innerHTML = agenF.length > 0 ? agenF.map(i => `<li>${i}</li>`).join('') : '<li class="empty">Nenhum agendamento.</li>'; }
+        renderizarPainelManutencoesGeral() { /* ... */ let todosAgendamentos = []; this.veiculos.forEach(v => { v.historicoManutencao.forEach(m => { const dM = new Date(m.data); dM.setHours(0,0,0,0); const hoje = new Date(); hoje.setHours(0,0,0,0); if (dM >= hoje) { todosAgendamentos.push({vM:v.modelo, vT:v._tipoVeiculo, mI:m.formatar(), dO:dM});}});}); todosAgendamentos.sort((a,b) => a.dO - b.dO); if (todosAgendamentos.length > 0) { this.el.listaTodosAgendamentos.innerHTML = todosAgendamentos.map(item => `<li class="maintenance-item"><strong>${item.vM} (${item.vT})</strong>: ${item.mI}</li>`).join(''); } else { this.el.listaTodosAgendamentos.innerHTML = '<li class="empty"><p>Nenhum agendamento futuro em toda a garagem.</p></li>'; }}
+
+        salvarNoLocalStorage() { /* ... como antes ... */ try { const vS = this.veiculos.map(v => { const vp = { ...v }; vp.historicoManutencao = v.historicoManutencao.map(m => m.toJSON()); delete vp.audioLigar; delete vp.audioDesligar; delete vp.audioErro; delete vp.audioBuzina; delete vp.audioAcelerar; delete vp.audioFrear; delete vp.audioTurbo; return vp; }); localStorage.setItem(GARAGEM_STORAGE_KEY, JSON.stringify(vS)); } catch (e) { console.error("Erro LS Save:", e); this.exibirNotificacaoGlobal("Falha ao salvar dados.", "error", true); } }
+        carregarDoLocalStorage() { /* ... como antes ... */ const dS = localStorage.getItem(GARAGEM_STORAGE_KEY); if (dS) { try { const vP = JSON.parse(dS); this.veiculos = vP.map(vp => { let vR; switch (vp._tipoVeiculo) { case 'CarroEsportivo': vR=new CarroEsportivo(vp.modelo,vp.cor); vR.turboAtivado=vp.turboAtivado; break; case 'Caminhao': vR=new Caminhao(vp.modelo,vp.cor,vp.capacidadeCarga); vR.cargaAtual=vp.cargaAtual; break; case 'Carro': vR=new Carro(vp.modelo,vp.cor); break; default: vR=new Veiculo(vp.modelo,vp.cor); break; } vR.ligado=vp.ligado; if(vR instanceof Carro) vR.velocidade=vp.velocidade||0; if(Array.isArray(vp.historicoManutencao)) { vR.historicoManutencao=vp.historicoManutencao.map(mP => new Manutencao(new Date(mP.data+'T00:00:00Z'),mP.tipo,mP.custo,mP.descricao)); } else { vR.historicoManutencao=[]; } return vR; }); } catch (e) { console.error("Erro LS Load:", e); this.veiculos=[]; localStorage.removeItem(GARAGEM_STORAGE_KEY); this.exibirNotificacaoGlobal("Dados salvos corrompidos. Garagem resetada.", "error", true); } } }
+        
+        verificarAgendamentosParaLembretes() { this.el.notificacoesLembretesContainer.innerHTML = ''; const hoje = new Date(); hoje.setUTCHours(0,0,0,0); const amanha = new Date(hoje); amanha.setUTCDate(hoje.getUTCDate() + 1); this.veiculos.forEach(v => { v.historicoManutencao.forEach(m => { const dM = new Date(m.data); dM.setUTCHours(0,0,0,0); let msgL=null; let tipoL="info"; if(dM.getTime()===hoje.getTime()){msgL=`HOJE: ${m.tipo} p/ ${v.modelo}(${v._tipoVeiculo}).`; tipoL="warning";} else if(dM.getTime()===amanha.getTime()){msgL=`AMANHÃ: ${m.tipo} p/ ${v.modelo}(${v._tipoVeiculo}).`; tipoL="info";} if(msgL)this.exibirNotificacaoLembrete(msgL,tipoL); }); }); }
+        exibirNotificacaoLembrete(msg, tipo="info", duracao=0) { /* ... como antes com botão fechar, duracao 0 para permanente */ const notif = document.createElement('div'); notif.className = `notificacao ${tipo}`; notif.textContent = msg; const btnF = document.createElement('button'); btnF.innerHTML='×'; btnF.className='close-notif'; btnF.onclick=()=>notif.remove(); notif.appendChild(btnF); this.el.notificacoesLembretesContainer.appendChild(notif); if(duracao>0)setTimeout(()=>notif.remove(),duracao); }
+        exibirNotificacaoGlobal(msg, tipo="info", permanente = false) { const notif = document.createElement('div'); notif.className = `notificacao ${tipo}`; notif.textContent = msg; const btnF = document.createElement('button'); btnF.innerHTML='×'; btnF.className='close-notif'; btnF.onclick=()=>notif.remove(); notif.appendChild(btnF); this.el.notificacoesGlobais.prepend(notif); if(!permanente) setTimeout(()=>notif.remove(), tipo === 'error' ? 7000 : 4000); }
+        limparNotificacaoGlobal() { this.el.notificacoesGlobais.innerHTML = ''; }
+    }
+
+    // --- INICIALIZAÇÃO ---
+    document.addEventListener('DOMContentLoaded', () => {
+        window.minhaGaragem = new Garagem();
+    });
+</script>
+</body>
+</html>
